@@ -1,0 +1,12 @@
+My solution basically consists of adding a function that returns the low 16 bits 
+of the RTC (ticks since midnight). To do so I added a function "read_rtc" to our
+custom stdio.h with a proper signature and implemented it in assembly on libc.S.
+This assembly implementation sets the 'AH' register to the appropriate service (0x00)
+of the 0x1a interruption (RTC), which returns the ticks since midnight on the CX, DX 
+registers (high and low 16 bits correspondingly), we then move the value on DX to AX
+and return. To print the result on main we create a string buffer of 8 bits (more 
+than enough to represent a 16 bit number in decimal, plus the \0 character), do 
+some arithmetic to get the digits, reverse the string and then print it. As we added
+a buffer on main.c gcc gives a __stack_chk_fail error on compilation (indicating
+that the program can blow up the stack), so we need to add -fno-stack-protector to
+compile the code.
