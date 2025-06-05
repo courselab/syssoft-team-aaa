@@ -1,3 +1,6 @@
+NUSP: 11795572
+Name: Christian Bernard Simas Correa Gioia Ribeiro
+
 My solution basically consists of adding a function that returns the low 16 bits 
 of the RTC (ticks since midnight). To do so I added a function "read_rtc" to our
 custom stdio.h with a proper signature and implemented it in assembly on libc.S.
