@@ -95,7 +95,7 @@ d) The kernel looks for libp4.so on the runpath specfied when a function from th
 
 e) When installing an executable on other hosts a static library is more portable than a shared one, as we only need the
 executable alone and not the library to run it. On the situation that the library is updated, a shared one gives more 
-flexibility, as we can just replace the file by a new updated one, rather than relinking the exectuable again with 
-a new version on the static case. Now for multiple programs running on the same host, a shared library is preferred as 
+flexibility, as we can just replace the file by a new updated one, rather than relinking the executable again with 
+a new version of the static one. Now for multiple programs running on the same host, a shared library is preferred as 
 all the necessary definitions come from only one place, saving memory, whereas with a static one it would be replicated
 on every single executable, having unecessary waste.
