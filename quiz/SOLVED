@@ -1,0 +1,101 @@
+NUSP: 11795572
+Name: Christian Bernard Simas Correa Gioia Ribeiro
+
+P1:
+
+The program prints its main function address. As we are on a system with virtual memory and ASLR is enabled
+by default (Address Space Layout Randomization, basically telling your program to run on a different address
+each time it's called), it is expected that the base address changes after we rerun the program.
+
+P2: 
+
+This is a classic buffer overflow example program. We have that the verified's address is right aftter
+user_key's, per gdb:
+
+(gdb) print &(user_key)
+$15 = (char (*)[10]) 0xffffd452
+(gdb) print &verified
+$16 = (int *) 0xffffd45c <-- exactly 10 bytes after
+
+then if we write a string on scanf with length bigger than 10, it overflows the buffer and writes on the memory
+position of verified. As any value different than zero defaults to true in a boolean, the check on verified fails
+and the program produces a wrong output. To mitigate this when there's no stack protection, we can use a width 
+specificer on scanf, or alternatively use fgets or getchar and read at most 10 characters from stdin. Using
+the first fix on p2fix.c we have:
+
+// p2fix.c output
+Enter password: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+Access denied
+
+as desired.
+
+P3:
+
+a) foo calls bar on the following line:
+ 804918f:	e8 0b 00 00 00       	call   804919f <bar>
+
+ it passes parameters to bar by pushing to the stack before making the call:
+ 80491ab:       83 ec 0c          sub    $0xc,%esp <-- make enough room by decreasing the stack pointer
+ 80491ae:       50                push   %eax <-- push the parameter to the stack
+    
+ This pattern of pushing the parameters to the stack before making a call is a calling convention, and this
+ happens under the ABI defined for 32 bit x86 programs (set of rules programs agree on when interacting with each other).
+
+b) the return value of bar is sent to foo via the eax register, this is also part of the calling convention
+of 32 bit x86 programs and is not linux only.
+
+c) the first two instructions are: 
+
+ push   %ebp
+ mov    %esp,%ebp
+
+and the second to last:
+ leave
+
+These instructions basically set and unset the current base pointer location. When we enter a function, we set 
+the base pointer equal to the current address of the stack, so we can do arithmetic and reference local variables
+and parameters, then when we leave a function we unset it to the base pointer of callee function using the leave
+instruction. These instructions are not always necessary, as they may be removed if we compile with -O2
+optimization, but normally we need them when we have to unwind the stack positions on nested function calls. 
+
+d) the third line is 
+    sub    $0x18,%esp
+we decrese the stack pointer address (keeping in mind that the stack "grows" towards 0) to make room for the local
+variables defined in these functions. Details on how the stack is operated on is defined by the x86 ABI. Now, for 
+the line on main:
+ and    $0xfffffff0,%esp
+We essentially make the last 4 bits of the stack pointer 0 (ie. a multiple of 16). This is differs from the
+instruction inside the other functions as this serves the purpose of stack alignment, needed to comply with
+the  ABI. 
+
+e) The compiler added a new instruction after return of bar inside the function foo:
+ movsbl %al,%eax
+it takes the lowest 8 bits of eax and extendes to be 32 bits. By defining foo and bar
+before main we can have the compiler perform type checking and verify if the functions
+are being called correctly.
+
+P4:
+
+a) All the programs output the same result except p4-v3, giving a libp4.so not found error. So we need to include
+the path of the libp4.so shared library to the linker:
+-rpath,'$$ORIGIN'
+This enables us to invoke the program from anywhere without giving an error.
+
+b) According to stat we have p4-v1 > p4-v2 > p4-v3, this can be justified by p4-v3 using a shared library, where it 
+only references some code on the shared library and does not store it on the binary, thus being the smallest, then
+we have the static library where only the necessary code inside of it is copied by the linker, and then finally 
+passing all the objects directly on the binary being the biggest.
+
+c) On p4-v1, both foo and bar are on the text section (the program's code), as expected because the linker just takes
+the code of the functions and put them in the final binary. For p4-v2, we have foo on the text section but not bar, as 
+the linker only put the code for the function actually being used (foo). Then for p4-v3, we have that the symbol for foo
+is included but undefined, also expected because it's only a reference for external code contained in the shared library.
+
+d) The kernel looks for libp4.so on the runpath specfied when a function from the lib is called at runtime.
+
+e) When installing an executable on other hosts a static library is more portable than a shared one, as we only need the
+executable alone and not the library to run it. On the situation that the library is updated, a shared one gives more 
+flexibility, as we can just replace the file by a new updated one, rather than relinking the exectuable again with 
+a new version on the static case. Now for multiple programs running on the same host, a shared library is preferred as 
+all the necessary definitions come from only one place, saving memory, whereas with a static one it would be replicated
+on every single executable, having unecessary waste.
